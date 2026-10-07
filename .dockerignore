@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+venv/
+.venv/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+test_app.py
+
+# Database (created at runtime)
+*.db
+*.sqlite3
+
+# Docs & IDE
+*.md
+*.docx
+*.pdf
+.vscode/
+.idea/
+
+# Git & CI
+.git/
+.github/
+.gitignore
+
+# Docker itself
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# OS
+.DS_Store
+Thumbs.db
