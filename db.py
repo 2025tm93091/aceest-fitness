@@ -29,6 +29,7 @@ DB_PATH = os.environ.get("ACEEST_DB_PATH", str(_default))
 # Connection helper
 # ---------------------------------------------------------------------------
 
+
 def _connect() -> sqlite3.Connection:
     """Open a connection with Row factory and foreign keys ON."""
     conn = sqlite3.connect(DB_PATH)

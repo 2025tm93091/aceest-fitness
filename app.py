@@ -42,6 +42,7 @@ def _ensure_db_ready():
 # Meta endpoints
 # ---------------------------------------------------------------------------
 
+
 @app.route("/")
 def home():
     """Root endpoint — confirms the service is running."""
