@@ -43,17 +43,19 @@ pipeline {
         }
 
         stage('Run Tests in Container') {
-            steps {
-                echo "=== Running pytest inside the image ==="
-                sh '''
-                    docker run --rm \
-                      -v "$WORKSPACE:/app" \
-                      -w /app \
-                      ${IMAGE_NAME}:${IMAGE_TAG} \
-                      sh -c "pip install pytest pytest-cov && pytest -v --cov=core --cov=db --cov=report --cov=app"
-                '''
-            }
-        }
+    steps {
+        echo "=== Running pytest inside the image ==="
+        sh '''
+            docker run --rm \
+              -v "$WORKSPACE:/app" \
+              -w /app \
+              -e ACEEST_DB_PATH=/tmp/aceest_test.db \
+              -e COVERAGE_FILE=/tmp/.coverage \
+              ${IMAGE_NAME}:${IMAGE_TAG} \
+              sh -c "pip install pytest pytest-cov && pytest -v --cov=core --cov=db --cov=report --cov=app --cov-report=term-missing"
+        '''
+    }
+}
 
         stage('Lint') {
             steps {
