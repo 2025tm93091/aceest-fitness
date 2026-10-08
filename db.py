@@ -13,13 +13,17 @@ Design choices:
     - Row factory set to sqlite3.Row → supports dict-like access
 """
 
+import os
 import sqlite3
 from pathlib import Path
 
 # Default DB file — sits next to this module.
-# Tests will monkeypatch this to a temp location.
-DB_PATH = str(Path(__file__).parent / "aceest_fitness.db")
-
+# Can be overridden with the ACEEST_DB_PATH environment variable,
+# useful for CI/container environments where the module directory
+# may be read-only.
+# Tests also monkeypatch this attribute directly.
+_default = Path(__file__).parent / "aceest_fitness.db"
+DB_PATH = os.environ.get("ACEEST_DB_PATH", str(_default))
 
 # ---------------------------------------------------------------------------
 # Connection helper

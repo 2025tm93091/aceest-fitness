@@ -25,9 +25,18 @@ from report import build_client_report
 # ---------------------------------------------------------------------------
 app = Flask(__name__)
 
-# Ensure the DB schema exists on startup (idempotent)
-db.init_db()
+# Initialize the DB schema lazily on the first request.
+# This allows test fixtures to redirect db.DB_PATH before init runs,
+# and avoids file-permission issues in containerized CI environments.
+_db_ready = False
 
+
+@app.before_request
+def _ensure_db_ready():
+    global _db_ready
+    if not _db_ready:
+        db.init_db()
+        _db_ready = True
 
 # ---------------------------------------------------------------------------
 # Meta endpoints
