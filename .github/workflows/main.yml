@@ -77,7 +77,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-            - name: Run tests inside container
+      - name: Run tests inside container
         run: |
           docker run --rm \
             -v "$PWD:/app" \
@@ -85,7 +85,7 @@ jobs:
             -e ACEEST_DB_PATH=/tmp/aceest_test.db \
             aceest-fitness:ci \
             sh -c "pip install pytest pytest-cov && pytest -v"
-            
+
       - name: Start container and check health
         run: |
           docker run -d --name aceest-ci -p 5000:5000 aceest-fitness:ci
