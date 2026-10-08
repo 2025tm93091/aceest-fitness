@@ -83,8 +83,9 @@ jobs:
             -v "$PWD:/app" \
             -w /app \
             -e ACEEST_DB_PATH=/tmp/aceest_test.db \
+            -e COVERAGE_FILE=/tmp/.coverage \
             aceest-fitness:ci \
-            sh -c "pip install pytest pytest-cov && pytest -v"
+            sh -c "pip install pytest pytest-cov && pytest -v --cov=core --cov=db --cov=report --cov=app --cov-report=term-missing"
 
       - name: Start container and check health
         run: |
