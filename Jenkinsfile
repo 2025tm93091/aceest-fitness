@@ -194,7 +194,7 @@ pipeline {
             script {
                 if (!params.SKIP_DEPLOY) {
                     withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
-                        sh 'scripts/deploy.sh rollback ${DOCKERHUB_USER} ${DEPLOY_STRATEGY} || true'
+                        sh 'chmod +x scripts/deploy.sh; scripts/deploy.sh rollback ${DOCKERHUB_USER} ${DEPLOY_STRATEGY} || true'
                     }
                 }
             }
