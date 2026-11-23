@@ -36,3 +36,5 @@ Thumbs.db
 
 # Environment
 .env
+# Local secrets - never commit
+kubeconfig*.yaml

@@ -22,7 +22,7 @@ pipeline {
         choice(name: 'DEPLOY_STRATEGY',
                choices: ['rolling', 'blue-green', 'canary', 'ab-testing', 'shadow'],
                description: 'Kubernetes release strategy for this build')
-        string(name: 'DOCKERHUB_USER', defaultValue: 'YOUR_DOCKERHUB_USER',
+        string(name: 'DOCKERHUB_USER', defaultValue: '2025tm93091',
                description: 'Docker Hub account that owns the aceest-fitness repo')
         string(name: 'STABLE_TAG', defaultValue: 'v1',
                description: 'Image tag currently trusted in production')
@@ -58,31 +58,48 @@ pipeline {
 
         stage('Lint') {
             steps {
-                // Same image as production, run as the Jenkins user so files
-                // written to the workspace stay owned by Jenkins.
+                // Build a CI image (same base as production) and copy the test file
+                // into a container. No volume mounts, so this works both on a VM and
+                // when Jenkins itself runs in Docker (docker-outside-of-docker).
                 sh '''
                     docker build -q -t aceest-ci:${BUILD_NUMBER} .
-                    docker run --rm -u $(id -u):$(id -g) -e HOME=/tmp \
-                      -v "$WORKSPACE:$WORKSPACE" -w "$WORKSPACE" aceest-ci:${BUILD_NUMBER} \
+                    docker rm -f lint-${BUILD_NUMBER} 2>/dev/null || true
+                    docker create --name lint-${BUILD_NUMBER} aceest-ci:${BUILD_NUMBER} \
                       flake8 app.py core.py db.py report.py test_app.py --max-line-length=100
-                '''
-            }
-        }
-
-        stage('Unit Tests') {
-            steps {
-                // Mounted at the same path so coverage.xml paths match for SonarQube.
-                sh '''
-                    docker run --rm -u $(id -u):$(id -g) -e HOME=/tmp \
-                      -e ACEEST_DB_PATH=/tmp/aceest_test.db -e COVERAGE_FILE=/tmp/.coverage \
-                      -v "$WORKSPACE:$WORKSPACE" -w "$WORKSPACE" aceest-ci:${BUILD_NUMBER} \
-                      pytest -v --junitxml=test-results.xml \
-                        --cov=core --cov=db --cov=report --cov=app \
-                        --cov-report=term-missing --cov-report=xml:coverage.xml
+                    docker cp test_app.py lint-${BUILD_NUMBER}:/app/test_app.py
+                    docker start -a lint-${BUILD_NUMBER}
                 '''
             }
             post {
-                always { junit 'test-results.xml' }
+                always { sh 'docker rm -f lint-${BUILD_NUMBER} || true' }
+            }
+        }
+
+        stage('Unit Tests (in container)') {
+            steps {
+                sh '''
+                    docker rm -f test-${BUILD_NUMBER} 2>/dev/null || true
+                    docker create --name test-${BUILD_NUMBER} \
+                      -e ACEEST_DB_PATH=/tmp/aceest_test.db -e COVERAGE_FILE=/tmp/.coverage \
+                      aceest-ci:${BUILD_NUMBER} \
+                      pytest -v -p no:cacheprovider --junitxml=/tmp/test-results.xml \
+                        --cov=core --cov=db --cov=report --cov=app \
+                        --cov-report=term-missing --cov-report=xml:/tmp/coverage.xml
+                    docker cp test_app.py test-${BUILD_NUMBER}:/app/test_app.py
+                    docker start -a test-${BUILD_NUMBER}
+                '''
+            }
+            post {
+                always {
+                    sh '''
+                        docker cp test-${BUILD_NUMBER}:/tmp/test-results.xml . || true
+                        docker cp test-${BUILD_NUMBER}:/tmp/coverage.xml . || true
+                        docker rm -f test-${BUILD_NUMBER} || true
+                        # coverage was measured under /app; point it at this workspace for SonarQube
+                        sed -i "s#<source>/app</source>#<source>${WORKSPACE}</source>#" coverage.xml || true
+                    '''
+                    junit allowEmptyResults: true, testResults: 'test-results.xml'
+                }
             }
         }
 

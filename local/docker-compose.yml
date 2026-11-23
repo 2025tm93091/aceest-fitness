@@ -1,0 +1,48 @@
+# ---------------------------------------------------------------------------
+# Local CI stack: Jenkins + SonarQube on the same laptop as Minikube.
+#   cd local
+#   docker compose up -d --build
+#   Jenkins   -> http://localhost:8080
+#   SonarQube -> http://localhost:9001   (admin / admin on first login)
+# Inside this network the two reach each other as http://jenkins:8080 and
+# http://sonarqube:9000. Jenkins also joins Minikube's "minikube" Docker
+# network, so it can reach the cluster API at https://192.168.49.2:8443.
+# ---------------------------------------------------------------------------
+services:
+  jenkins:
+    build: ./jenkins
+    container_name: jenkins
+    user: root
+    ports:
+      - "8080:8080"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [ci, minikube]
+    restart: unless-stopped
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: sonarqube
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+      # Allow webhooks to private/local hosts such as http://jenkins:8080
+      # (SonarQube rejects them by default as SSRF protection -> HTTP 400).
+      SONAR_VALIDATEWEBHOOKS: "false"
+    ports:
+      - "9001:9000"   # host port 9001 (9000 is used by Zscaler on this laptop)
+    volumes:
+      - sonar_data:/opt/sonarqube/data
+      - sonar_extensions:/opt/sonarqube/extensions
+    networks: [ci]
+    restart: unless-stopped
+
+networks:
+  ci:
+  minikube:
+    external: true   # created by "minikube start --driver=docker"
+
+volumes:
+  jenkins_home:
+  sonar_data:
+  sonar_extensions:
