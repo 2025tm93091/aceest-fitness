@@ -1,0 +1,63 @@
+# ROLLING UPDATE
+# Pods are replaced one at a time; readinessProbe gates traffic so there is
+# zero downtime. Upgrade:  kubectl -n aceest set image deployment/aceest-rolling app=<user>/aceest-fitness:v2
+# Rollback:               kubectl -n aceest rollout undo deployment/aceest-rolling
+# Endpoint:               minikube service aceest-rolling -n aceest --url
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-rolling
+  namespace: aceest
+  labels:
+    app: aceest-rolling
+spec:
+  replicas: 4
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1          # at most 1 extra pod during the update
+      maxUnavailable: 0    # never drop below the desired replica count
+  selector:
+    matchLabels:
+      app: aceest-rolling
+  template:
+    metadata:
+      labels:
+        app: aceest-rolling
+    spec:
+      containers:
+        - name: app
+          image: DOCKERHUB_USER/aceest-fitness:v1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+          env:
+            - name: APP_VARIANT
+              value: "rolling"
+          readinessProbe:
+            httpGet: {path: /health, port: 5000}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health, port: 5000}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 250m, memory: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-rolling
+  namespace: aceest
+spec:
+  type: NodePort
+  selector:
+    app: aceest-rolling
+  ports:
+    - port: 80
+      targetPort: 5000
+      nodePort: 30080

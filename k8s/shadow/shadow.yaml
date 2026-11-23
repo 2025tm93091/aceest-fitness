@@ -1,0 +1,139 @@
+# SHADOW (MIRRORED) DEPLOYMENT
+# Users are served only by production v1. NGINX copies every request to the
+# shadow v2 and throws its response away, so v2 is tested with real traffic
+# at zero user risk. Check: kubectl -n aceest logs deploy/aceest-shadow
+# Requires: minikube addons enable ingress
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-production
+  namespace: aceest
+  labels:
+    app: aceest-shadow-demo
+    role: production
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: aceest-shadow-demo
+      role: production
+  template:
+    metadata:
+      labels:
+        app: aceest-shadow-demo
+        role: production
+    spec:
+      containers:
+        - name: app
+          image: DOCKERHUB_USER/aceest-fitness:v1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+          env:
+            - name: APP_VARIANT
+              value: "production"
+          readinessProbe:
+            httpGet: {path: /health, port: 5000}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health, port: 5000}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 250m, memory: 256Mi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-shadow
+  namespace: aceest
+  labels:
+    app: aceest-shadow-demo
+    role: shadow
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: aceest-shadow-demo
+      role: shadow
+  template:
+    metadata:
+      labels:
+        app: aceest-shadow-demo
+        role: shadow
+    spec:
+      containers:
+        - name: app
+          image: DOCKERHUB_USER/aceest-fitness:v2
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+          env:
+            - name: APP_VARIANT
+              value: "shadow"
+          readinessProbe:
+            httpGet: {path: /health, port: 5000}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health, port: 5000}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 250m, memory: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-production
+  namespace: aceest
+spec:
+  type: ClusterIP
+  selector:
+    app: aceest-shadow-demo
+    role: production
+  ports:
+    - port: 80
+      targetPort: 5000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-shadow
+  namespace: aceest
+spec:
+  type: ClusterIP
+  selector:
+    app: aceest-shadow-demo
+    role: shadow
+  ports:
+    - port: 80
+      targetPort: 5000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aceest-shadow
+  namespace: aceest
+  annotations:
+    nginx.ingress.kubernetes.io/mirror-target: "http://aceest-shadow.aceest.svc.cluster.local$request_uri"
+    nginx.ingress.kubernetes.io/mirror-request-body: "on"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: shadow.aceest.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: aceest-production
+                port:
+                  number: 80

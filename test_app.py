@@ -246,6 +246,18 @@ def test_home(client):
     assert data["service"].startswith("ACEest")
 
 
+def test_version_endpoint(client):
+    r = client.get("/version")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert {"version", "variant", "pod"} <= set(data)
+
+
+def test_home_reports_version(client):
+    data = client.get("/").get_json()
+    assert data["version"] and data["variant"]
+
+
 def test_health(client):
     r = client.get("/health")
     assert r.status_code == 200

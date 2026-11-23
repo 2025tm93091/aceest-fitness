@@ -1,0 +1,6 @@
+# Namespace that holds every ACEest deployment strategy demo
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aceest

@@ -75,6 +75,27 @@ aceest-fitness/
 
 ---
 
+## Assignment 2 — Kubernetes, SonarQube & Deployment Strategies
+
+| Area | Where |
+|---|---|
+| Kubernetes manifests (namespace `aceest`) | `k8s/` |
+| Rolling update (NodePort 30080) | `k8s/rolling-update/rolling.yaml` |
+| Blue-Green (NodePort 30081, selector switch) | `k8s/blue-green/blue-green.yaml` |
+| Canary (NGINX weighted 20 %) | `k8s/canary/canary.yaml` |
+| A/B testing (header `X-Variant: B` / cookie) | `k8s/ab-testing/ab-testing.yaml` |
+| Shadow (NGINX request mirroring) | `k8s/shadow/shadow.yaml` |
+| Deploy / rollback helper | `scripts/deploy.sh <strategy> <dockerhub-user> <new-tag> [stable-tag]` |
+| SonarQube configuration | `sonar-project.properties` |
+| Jenkins pipeline (lint → test → Sonar → quality gate → build → push → deploy → smoke test → artifacts, auto-rollback) | `Jenkinsfile` |
+| GitHub Actions (adds manifest validation + Docker Hub push) | `.github/workflows/main.yml` |
+| Step-by-step instructions | `docs/RUNBOOK.md` |
+
+`GET /version` returns the release version, variant and pod name, so every strategy can be
+observed from the command line.
+
+---
+
 ## Local Setup & Execution
 
 ### Prerequisites
