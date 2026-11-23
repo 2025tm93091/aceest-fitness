@@ -11,11 +11,20 @@
 
 FROM python:3.14-slim
 
+# Release identifier baked into the image (shown by GET / and GET /version).
+#   docker build --build-arg APP_VERSION=2.0.0 -t <user>/aceest-fitness:v2 .
+ARG APP_VERSION=1.0.0
+LABEL org.opencontainers.image.title="aceest-fitness" \
+      org.opencontainers.image.version="${APP_VERSION}" \
+      org.opencontainers.image.source="https://github.com/2025tm93091/aceest-fitness"
+
 # Prevent .pyc files and enable unbuffered stdout (better for docker logs)
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    APP_VERSION=${APP_VERSION} \
+    ACEEST_DB_PATH=/tmp/aceest_fitness.db
 
 WORKDIR /app
 

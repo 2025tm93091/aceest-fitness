@@ -1,0 +1,158 @@
+# CANARY RELEASE (NGINX Ingress weighted routing)
+# Stable v1 takes most traffic; the canary v2 receives canary-weight percent.
+# Increase gradually: kubectl -n aceest annotate ingress aceest-canary nginx.ingress.kubernetes.io/canary-weight=50 --overwrite
+# Promote: set image of aceest-stable to v2 and delete the canary ingress.
+# Requires: minikube addons enable ingress
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-stable
+  namespace: aceest
+  labels:
+    app: aceest-canary-demo
+    track: stable
+spec:
+  replicas: 4
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: aceest-canary-demo
+      track: stable
+  template:
+    metadata:
+      labels:
+        app: aceest-canary-demo
+        track: stable
+    spec:
+      containers:
+        - name: app
+          image: DOCKERHUB_USER/aceest-fitness:v1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+          env:
+            - name: APP_VARIANT
+              value: "stable"
+          readinessProbe:
+            httpGet: {path: /health, port: 5000}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health, port: 5000}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 250m, memory: 256Mi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-canary
+  namespace: aceest
+  labels:
+    app: aceest-canary-demo
+    track: canary
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: aceest-canary-demo
+      track: canary
+  template:
+    metadata:
+      labels:
+        app: aceest-canary-demo
+        track: canary
+    spec:
+      containers:
+        - name: app
+          image: DOCKERHUB_USER/aceest-fitness:v2
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+          env:
+            - name: APP_VARIANT
+              value: "canary"
+          readinessProbe:
+            httpGet: {path: /health, port: 5000}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health, port: 5000}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 250m, memory: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-stable
+  namespace: aceest
+spec:
+  type: ClusterIP
+  selector:
+    app: aceest-canary-demo
+    track: stable
+  ports:
+    - port: 80
+      targetPort: 5000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-canary
+  namespace: aceest
+spec:
+  type: ClusterIP
+  selector:
+    app: aceest-canary-demo
+    track: canary
+  ports:
+    - port: 80
+      targetPort: 5000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aceest-stable
+  namespace: aceest
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: canary.aceest.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: aceest-stable
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aceest-canary
+  namespace: aceest
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-weight: "20"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: canary.aceest.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: aceest-canary
+                port:
+                  number: 80

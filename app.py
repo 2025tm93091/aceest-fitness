@@ -12,6 +12,8 @@ Then:
     http://localhost:5000
 """
 
+import os
+import socket
 from io import BytesIO
 
 from flask import Flask, jsonify, request, send_file
@@ -24,6 +26,12 @@ from report import build_client_report
 # App factory-ish setup
 # ---------------------------------------------------------------------------
 app = Flask(__name__)
+
+# Version / variant are injected at deploy time (Docker build-arg or K8s env).
+# They let us *see* which release served a request during Blue-Green,
+# Canary, A/B and Shadow deployments.
+APP_VERSION = os.environ.get("APP_VERSION", "1.0.0")
+APP_VARIANT = os.environ.get("APP_VARIANT", "stable")
 
 # Initialize the DB schema lazily on the first request.
 # This allows test fixtures to redirect db.DB_PATH before init runs,
@@ -49,8 +57,21 @@ def home():
     return jsonify(
         {
             "service": "ACEest Fitness & Gym API",
-            "version": "1.0.0",
+            "version": APP_VERSION,
+            "variant": APP_VARIANT,
             "status": "running",
+        }
+    )
+
+
+@app.route("/version")
+def version():
+    """Which release / pod served this request (used to demo deployments)."""
+    return jsonify(
+        {
+            "version": APP_VERSION,
+            "variant": APP_VARIANT,
+            "pod": socket.gethostname(),
         }
     )
 
