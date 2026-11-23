@@ -3,8 +3,8 @@
 
 Student: Bhanu Prakash (2025tm93091) · Course: Introduction to DevOps · BITS Pilani WILP
 Repository: https://github.com/2025tm93091/aceest-fitness
-Docker Hub: https://hub.docker.com/r/YOUR_DOCKERHUB_USER/aceest-fitness
-Cluster endpoints: Rolling `http://<minikube-ip>:30080` · Blue-Green `http://<minikube-ip>:30081` ·
+Docker Hub: https://hub.docker.com/r/2025tm93091/aceest-fitness
+Cluster endpoints: Rolling `http://192.168.49.2:30080` · Blue-Green `http://192.168.49.2:30081` ·
 Ingress hosts `canary.aceest.local`, `ab.aceest.local`, `shadow.aceest.local`
 
 ---
@@ -31,7 +31,7 @@ The test suite now has 58 tests (97 % coverage).
 ```
  Developer ──push──▶ GitHub ──▶ GitHub Actions: lint → test → docker build → K8s manifest
     │                  │                         validation → push image to Docker Hub
-    │                  └──pollSCM (5 min)──▶ Jenkins (Prayogsala VM)
+    │                  └──pollSCM (5 min)──▶ Jenkins (Docker on laptop)
     │                        Checkout → Lint → Unit tests (JUnit + coverage.xml)
     │                        → SonarQube analysis → Quality Gate → Build image vN
     │                        → Push to Docker Hub → Deploy (chosen strategy) → Smoke test
@@ -81,8 +81,12 @@ Docker Hub or the cluster.
 
 ## 5. Jenkins pipeline
 
-`pollSCM('H/5 * * * *')` checks GitHub every five minutes. A webhook was not usable because
-the Prayogsala VM is not reachable from the internet. Parameters select the deployment
+Jenkins and SonarQube run as Docker containers on the developer laptop (`local/docker-compose.yml`),
+alongside Minikube. Jenkins uses the host Docker engine through the mounted socket and joins the
+`minikube` Docker network to reach the cluster API.
+
+`pollSCM('H/5 * * * *')` checks GitHub every five minutes. A GitHub webhook was not usable because
+Jenkins runs on a laptop that is not reachable from the internet. Parameters select the deployment
 strategy, Docker Hub user and stable tag. Credentials (`dockerhub-creds`, `kubeconfig`, Sonar
 token) are kept in the Jenkins credential store and never in the repository. Every build
 archives a versioned source bundle `aceest-fitness-vN.tar.gz` together with test and coverage
@@ -95,10 +99,10 @@ for the selected strategy.
 
 | Challenge | Resolution |
 |---|---|
-| Files written into the Jenkins workspace by containers became unreadable (container user ≠ Jenkins user) | Containers run with `-u $(id -u):$(id -g)` and the workspace is mounted at the same path, which also keeps coverage paths valid for SonarQube |
+| Jenkins runs in Docker and drives the host Docker engine, so workspace bind mounts point at the wrong filesystem | Tests run in a container created from the CI image; `docker cp` copies the test file in and the JUnit/coverage reports out, and the coverage source path is rewritten for SonarQube |
 | SQLite could not write inside a read-only or foreign-owned app directory | Database path set through `ACEEST_DB_PATH=/tmp/...` in the image |
 | Telling releases apart during canary, A/B and shadow tests | Added `/version` returning version, variant and pod name |
-| Jenkins could not use Minikube's default kubeconfig (certificate file paths) | Flattened kubeconfig (`kubectl config view --flatten`) stored as a secret-file credential |
+| Jenkins could not use Minikube's default kubeconfig (certificate file paths, 127.0.0.1 address) | Flattened kubeconfig with the server rewritten to the Minikube IP (`https://192.168.49.2:8443`), stored as a Jenkins secret-file credential |
 | GitHub webhooks cannot reach the private VM | SCM polling every 5 minutes |
 | `deploy.sh` broke when committed from Windows (CRLF line endings) | `.gitattributes` forces LF for scripts and YAML |
 | Ingress on Minikube with the Docker driver (Windows) | `minikube addons enable ingress` plus `minikube tunnel`; hosts selected with the `Host` header |
